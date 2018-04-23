@@ -37,12 +37,26 @@ const int HEAL = 7;
 const int STRENGTH = 8;
 
 const int numAction = 9; // 9 actions 
-const int numFeature = 11; // 11 features: alive, self globe, self stoneskin, self strength, self low health, self critical,
-// enemy globe, enemy stoneskin, enemy strength, enemy low health and enemy critical
+const int numFeature = 13; // 13 features: alive, self globe, self stoneskin, self strength, self low health, self critical,
+// enemy globe, enemy stoneskin, enemy strength, enemy low health and enemy critical, health potion, strength potion
 
-float alpha = 0.85f;
-float gamma = 0.55f;
-float epsilon = 0.90f;
+const int ALIVE = 0;
+const int SELFGLOBE = 1;
+const int SELFSTONESKIN = 2;
+const int SELFSTRENGTH = 3;
+const int SELFLOWHEALTH = 4;
+const int SELFCRITICAL = 5;
+const int ENEMYGLOBE = 6;
+const int ENEMYSTONESKIN = 7;
+const int ENEMYSTRENGTH = 8;
+const int ENEMYLOWHEALTH = 9;
+const int ENEMYCRITICAL = 10;
+const int HEALTHPOTION = 11;
+const int STRENGTHPOTION = 12;
+
+float alpha = 0.25f;
+float gamma = 0.65f;
+float epsilon = 0.60f;
 
 float weights[numAction][numFeature]; // the weight matrix used for functon approximation
 int features[numFeature]; // boolean features with values 1 or 0
@@ -142,25 +156,26 @@ int main() {
 				oldFeatures[i] = features[i];
 			}
 
-
 			// Update features
-			features[1] = currentTurn.myGlobe;
-			features[2] = currentTurn.myStoneskin;
-			features[3] = currentTurn.myStrength;
-			features[4] = myState.health < 50 ? 1 : 0;
-			features[5] = myState.health < 10 ? 1 : 0;
-			features[6] = currentTurn.oppGlobe;
-			features[7] = currentTurn.oppStoneskin;
-			features[8] = currentTurn.oppStrength;
-			features[9] = currentTurn.oppHealthLow;
-			features[10] = currentTurn.oppHealthCritical;
+			features[SELFGLOBE] = currentTurn.myGlobe;
+			features[SELFSTONESKIN] = currentTurn.myStoneskin;
+			features[SELFSTRENGTH] = currentTurn.myStrength;
+			features[SELFLOWHEALTH] = myState.health < 50 ? 1 : 0;
+			features[SELFCRITICAL] = myState.health < 10 ? 1 : 0;
+			features[ENEMYGLOBE] = currentTurn.oppGlobe;
+			features[ENEMYSTONESKIN] = currentTurn.oppStoneskin;
+			features[ENEMYSTRENGTH] = currentTurn.oppStrength;
+			features[ENEMYLOWHEALTH] = currentTurn.oppHealthLow;
+			features[ENEMYCRITICAL] = currentTurn.oppHealthCritical;
+			features[HEALTHPOTION] = myState.healingPotion;
+			features[STRENGTHPOTION] = myState.strengthPotion;
 
 			// Update Weights
 			float reward = static_cast<float>(currentTurn.damageDealt - currentTurn.damageTaken);
 			updateWeights(currentTurn.myAction, reward, oldFeatures);
 
 		}
-		epsilon -= 0.05f;
+		epsilon -= 0.02f;
 	}
 
 	// Save the new weights for the player
@@ -185,14 +200,19 @@ int selectAction(const GameState &playerState, const GameState &opponentState) {
 	int action = IDLE;
 	float randomValue = static_cast <float> (rand()) / static_cast <float> (RAND_MAX);
 	if (randomValue < epsilon) {
-		action = rand() % numAction;
-		while ((action == STRENGTH && !playerState.strengthPotion) || (action == HEAL && !playerState.healingPotion)) {
+		while (true) {
 			action = rand() % numAction;
+			if ((action == STRENGTH && !features[STRENGTHPOTION]) || (action == HEAL && !features[HEALTHPOTION])) {
+				continue;
+			} else if (true) {
+
+			}
 		}
 	} else {
 		float currentWeight = -100000.f;
 		for (int i = 0; i < numAction; i++) {
-			if ((i == STRENGTH && !playerState.strengthPotion) || (i == HEAL && !playerState.healingPotion)) {
+			if ((action == STRENGTH && !features[STRENGTHPOTION]) || (action == HEAL && !features[HEALTHPOTION])) {
+
 				continue;
 			}
 			float resultWeight = 0.f;
