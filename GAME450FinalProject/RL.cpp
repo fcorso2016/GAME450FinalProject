@@ -40,9 +40,9 @@ const int numAction = 9; // 9 actions
 const int numFeature = 11; // 11 features: alive, self globe, self stoneskin, self strength, self low health, self critical,
 // enemy globe, enemy stoneskin, enemy strength, enemy low health and enemy critical
 
-float alpha = 0.25f;
-float gamma = 0.75f;
-float epsilon = 0.65f;
+float alpha = 0.85f;
+float gamma = 0.55f;
+float epsilon = 0.90f;
 
 float weights[numAction][numFeature]; // the weight matrix used for functon approximation
 int features[numFeature]; // boolean features with values 1 or 0
@@ -169,7 +169,7 @@ int main() {
 	if (fout.is_open()) {
 		for (int i = 0; i < numAction; i++) {
 			for (int j = 0; j < numFeature; j++) {
-				fout << weights[i][j];
+				fout << weights[i][j] << " ";
 			}
 		}
 	}
@@ -227,7 +227,9 @@ void updateWeights(int action, float reward, const int oldFeatures[numFeature]) 
 		}
 	}
 	for (int i = 0; i < numFeature; i++) {
-		weights[action][i] = weights[action][i] + alpha * (reward + gamma * maxWeight - oldWeight);
+		if (oldFeatures[i] == 1) {
+			weights[action][i] = weights[action][i] + alpha * (reward + gamma * maxWeight - oldWeight);
+		}
 	}
 }
 
