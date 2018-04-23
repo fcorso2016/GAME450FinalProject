@@ -1,5 +1,7 @@
 #include <iostream>
 #include <time.h>
+#include <cmath>
+#include <fstream>
 using namespace std;
 
 struct Turn {
@@ -38,25 +40,39 @@ const int numAction = 9; // 9 actions
 const int numFeature = 11; // 11 features: alive, self globe, self stoneskin, self strength, self low health, self critical,
 // enemy globe, enemy stoneskin, enemy strength, enemy low health and enemy critical
 
-float alpha = 0.1;
-float gamma = 0.1;
-float epsilon = 0.1;
+float alpha = 0.25f;
+float gamma = 0.75f;
+float epsilon = 0.65f;
 
 float weights[numAction][numFeature]; // the weight matrix used for functon approximation
 int features[numFeature]; // boolean features with values 1 or 0
 
 int selectAction(const GameState &playerState, const GameState &opponentState);
+void updateWeights(int action, float reward, const int oldFeatures[numFeature]);
 void printWeights();
 
 int main() {
 	srand(time(NULL));
 
-	// random initialization of weights
-	for (int i = 0; i < numAction; i++) {
-		for (int j = 0; j < numFeature; j++) {
-			weights[i][j] = static_cast <float> (rand()) / static_cast <float> (RAND_MAX);
+	// Check to see if files exist
+	ifstream fin;
+	fin.open("memory.txt");
+	if (fin.is_open()) {
+		// load weights in from file
+		for (int i = 0; i < numAction; i++) {
+			for (int j = 0; j < numFeature; j++) {
+				fin >> weights[i][j];
+			}
+		}
+	} else {
+		// random initialization of weights
+		for (int i = 0; i < numAction; i++) {
+			for (int j = 0; j < numFeature; j++) {
+				weights[i][j] = static_cast <float> (rand()) / static_cast <float> (RAND_MAX);
+			}
 		}
 	}
+	fin.close();
 
 	features[0] = 1;
 	for (int i = 1; i < numFeature; i++) {
@@ -120,8 +136,12 @@ int main() {
 				break;
 			}
 
-			// 11 features: alive, self globe, self stoneskin, self strength, self low health, self critical,
-			// enemy globe, enemy stoneskin, enemy strength, enemy low health and enemy critical
+			// Store old features
+			int oldFeatures[numFeature];
+			for (int i = 0; i < numFeature; i++) {
+				oldFeatures[i] = features[i];
+			}
+
 
 			// Update features
 			features[1] = currentTurn.myGlobe;
@@ -135,9 +155,24 @@ int main() {
 			features[9] = currentTurn.oppHealthLow;
 			features[10] = currentTurn.oppHealthCritical;
 
+			// Update Weights
+			float reward = static_cast<float>(currentTurn.damageDealt - currentTurn.damageTaken);
+			updateWeights(currentTurn.myAction, reward, oldFeatures);
+
 		}
+		epsilon -= 0.05f;
 	}
 
+	// Save the new weights for the player
+	ofstream fout;
+	fout.open("memory.txt");
+	if (fout.is_open()) {
+		for (int i = 0; i < numAction; i++) {
+			for (int j = 0; j < numFeature; j++) {
+				fout << weights[i][j];
+			}
+		}
+	}
 
 	cerr << endl;
 	cout.flush();
@@ -148,23 +183,52 @@ int main() {
 // selects an action based on reinforcement learning
 int selectAction(const GameState &playerState, const GameState &opponentState) {
 	int action = IDLE;
-	float currentWeight = -100000.f;
-	for (int i = 0; i < numAction; i++) {
-		if ((i == STRENGTH && !playerState.strengthPotion) || (i == HEAL && !playerState.healingPotion)) {
-			continue;
+	float randomValue = static_cast <float> (rand()) / static_cast <float> (RAND_MAX);
+	if (randomValue < epsilon) {
+		action = rand() % numAction;
+		while ((action == STRENGTH && !playerState.strengthPotion) || (action == HEAL && !playerState.healingPotion)) {
+			action = rand() % numAction;
 		}
-		float resultWeight = 0.f;
-		for (int j = 0; j < numFeature; j++) {
-			if (features[j] == 1) {
-				resultWeight += weights[i][j];
+	} else {
+		float currentWeight = -100000.f;
+		for (int i = 0; i < numAction; i++) {
+			if ((i == STRENGTH && !playerState.strengthPotion) || (i == HEAL && !playerState.healingPotion)) {
+				continue;
 			}
-		}
-		if (resultWeight > currentWeight) {
-			currentWeight = resultWeight;
-			action = i;
+			float resultWeight = 0.f;
+			for (int j = 0; j < numFeature; j++) {
+				if (features[j] == 1) {
+					resultWeight += weights[i][j];
+				}
+			}
+			if (resultWeight > currentWeight) {
+				currentWeight = resultWeight;
+				action = i;
+			}
 		}
 	}
 	return action;
+}
+
+// updates the weight based on the action
+void updateWeights(int action, float reward, const int oldFeatures[numFeature]) {
+	float oldWeight = 0.f;
+	for (int i = 0; i < numFeature; i++) {
+		oldWeight += weights[action][i] * oldFeatures[i];
+	}
+	float maxWeight = -10000000000.f;
+	for (int i = 0; i < numAction; i++) {
+		float sumWeights = 0.f;
+		for (int j = 0; j < numFeature; j++) {
+			sumWeights += weights[i][j] * features[j];
+		}
+		if (sumWeights > maxWeight) {
+			maxWeight = sumWeights;
+		}
+	}
+	for (int i = 0; i < numFeature; i++) {
+		weights[action][i] = weights[action][i] + alpha * (reward + gamma * maxWeight - oldWeight);
+	}
 }
 
 
