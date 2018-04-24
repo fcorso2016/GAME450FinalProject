@@ -37,8 +37,7 @@ const int HEAL = 7;
 const int STRENGTH = 8;
 
 const int numAction = 9; // 9 actions 
-const int numFeature = 13; // 13 features: alive, self globe, self stoneskin, self strength, self low health, self critical,
-// enemy globe, enemy stoneskin, enemy strength, enemy low health and enemy critical, health potion, strength potion
+const int numFeature = 15;
 
 const int ALIVE = 0;
 const int SELFGLOBE = 1;
@@ -53,10 +52,12 @@ const int ENEMYLOWHEALTH = 9;
 const int ENEMYCRITICAL = 10;
 const int HEALTHPOTION = 11;
 const int STRENGTHPOTION = 12;
+const int ENEMYHEALTHPOTION = 13;
+const int ENEMYSTRENGTHPOTION = 14;
 
-float alpha = 0.25f;
-float gamma = 0.65f;
-float epsilon = 0.60f;
+float alpha = 0.15f;
+float gamma = 0.55f;
+float epsilon = 0.50f;
 
 float weights[numAction][numFeature]; // the weight matrix used for functon approximation
 int features[numFeature]; // boolean features with values 1 or 0
@@ -100,6 +101,22 @@ int main() {
 	cin >> numRounds;
 
 	for (int i = 0; i < numRounds; i++) {
+		// Reset features
+		features[SELFGLOBE] = 0;
+		features[SELFSTONESKIN] = 0;
+		features[SELFSTRENGTH] = 0;
+		features[SELFLOWHEALTH] = 0;
+		features[SELFCRITICAL] = 0;
+		features[ENEMYGLOBE] = 0;
+		features[ENEMYSTONESKIN] = 0;
+		features[ENEMYSTRENGTH] = 0;
+		features[ENEMYLOWHEALTH] = 0;
+		features[ENEMYCRITICAL] = 0;
+		features[HEALTHPOTION] = 1;
+		features[STRENGTHPOTION] = 1;
+		features[ENEMYHEALTHPOTION] = 1;
+		features[ENEMYSTRENGTHPOTION] = 1;
+
 		while (true) { // Game Loop
 			Turn currentTurn;
 
@@ -167,15 +184,17 @@ int main() {
 			features[ENEMYSTRENGTH] = currentTurn.oppStrength;
 			features[ENEMYLOWHEALTH] = currentTurn.oppHealthLow;
 			features[ENEMYCRITICAL] = currentTurn.oppHealthCritical;
-			features[HEALTHPOTION] = myState.healingPotion;
-			features[STRENGTHPOTION] = myState.strengthPotion;
+			features[HEALTHPOTION] = myState.healingPotion ? 1 : 0;
+			features[STRENGTHPOTION] = myState.strengthPotion ? 1 : 0;
+			features[ENEMYHEALTHPOTION] = oppState.healingPotion ? 1 : 0;
+			features[ENEMYSTRENGTHPOTION] = oppState.strengthPotion ? 1 : 0;
 
 			// Update Weights
 			float reward = static_cast<float>(currentTurn.damageDealt - currentTurn.damageTaken);
 			updateWeights(currentTurn.myAction, reward, oldFeatures);
 
 		}
-		epsilon -= 0.02f;
+		epsilon -= (0.02f * 20.f) / static_cast<float>(numRounds);
 	}
 
 	// Save the new weights for the player
@@ -202,24 +221,35 @@ int selectAction(const GameState &playerState, const GameState &opponentState) {
 	if (randomValue < epsilon) {
 		while (true) {
 			action = rand() % numAction;
-			if ((action == STRENGTH && !features[STRENGTHPOTION]) || (action == HEAL && !features[HEALTHPOTION])) {
+			if (action == STONESKIN && features[SELFSTONESKIN]) {
 				continue;
-			} else if (true) {
-
+			} else if (action == GLOBE && features[SELFGLOBE]) {
+				continue;
+			} else if (action == HEAL && !features[HEALTHPOTION]) {
+				continue;
+			} else if (action == STRENGTH && !features[STRENGTHPOTION]) {
+				continue;
 			}
+			break;
 		}
 	} else {
-		float currentWeight = -100000.f;
-		for (int i = 0; i < numAction; i++) {
-			if ((action == STRENGTH && !features[STRENGTHPOTION]) || (action == HEAL && !features[HEALTHPOTION])) {
-
+		float currentWeight = 0.f;
+		for (int j = 0; j < numFeature; j++) {
+			currentWeight += weights[0][j] * features[j];
+		}
+		for (int i = 1; i < numAction; i++) {
+			if (i == STONESKIN && features[SELFSTONESKIN]) {
+				continue;
+			} else if (i == GLOBE && features[SELFGLOBE]) {
+				continue;
+			} else if (i == HEAL && !features[HEALTHPOTION]) {
+				continue;
+			} else if (i == STRENGTH && !features[STRENGTHPOTION]) {
 				continue;
 			}
 			float resultWeight = 0.f;
 			for (int j = 0; j < numFeature; j++) {
-				if (features[j] == 1) {
-					resultWeight += weights[i][j];
-				}
+				resultWeight += weights[i][j] * features[j];
 			}
 			if (resultWeight > currentWeight) {
 				currentWeight = resultWeight;
@@ -236,8 +266,11 @@ void updateWeights(int action, float reward, const int oldFeatures[numFeature]) 
 	for (int i = 0; i < numFeature; i++) {
 		oldWeight += weights[action][i] * oldFeatures[i];
 	}
-	float maxWeight = -10000000000.f;
-	for (int i = 0; i < numAction; i++) {
+	float maxWeight = 0.f;
+	for (int j = 0; j < numFeature; j++) {
+		maxWeight += weights[0][j] * features[j];
+	}
+	for (int i = 1; i < numAction; i++) {
 		float sumWeights = 0.f;
 		for (int j = 0; j < numFeature; j++) {
 			sumWeights += weights[i][j] * features[j];
@@ -248,7 +281,7 @@ void updateWeights(int action, float reward, const int oldFeatures[numFeature]) 
 	}
 	for (int i = 0; i < numFeature; i++) {
 		if (oldFeatures[i] == 1) {
-			weights[action][i] = weights[action][i] + alpha * (reward + gamma * maxWeight - oldWeight);
+			weights[action][i] = weights[action][i] + (alpha * (reward + (gamma * maxWeight) - oldWeight));
 		}
 	}
 }

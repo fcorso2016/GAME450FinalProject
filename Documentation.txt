@@ -1,0 +1,5 @@
+1. SARSA
+2. The AI reads in the weights from a text file, but will set them randomly if said file cannot be found
+3. Alive (always on), self has globe, self has stoneskin, self has strength, self health low, self health critical, enemy has globe, enemy has stoneskin, enemy has strength, enemy health low, enemy health critical, has own health potion, has own strength potion, enemy has health potion, enemy has strength potion
+4. alpha = 0.25, gamma = 0.55, epsilon = 0.50; alpha and gamma remain constant and epsilon decreases each round by an amound that depends on the number of rounds in the duel
+5. The aggressive agent because the AI bases its rewards based on damage taken and dealt meaning it makes the AI more inclined to reward actions that deal more damage as opposed to defensive abilities
